@@ -1,0 +1,3 @@
+
+
+find /Volumes/Volume_2/max-movies -type d -depth 1 | ./ts2iso.py -f -
