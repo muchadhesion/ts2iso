@@ -30,15 +30,16 @@ def transcode(infile, outfile=None, skip_existing=True, dry_run = True):
     # create the file in the same dir (and same filesystem) as the final target,
     # this keeps our final shutil.move efficient
     dirname = os.path.dirname(outfile)
-    base = os.path.basename(outfile)
+    basename = os.path.basename(outfile)
+    undecorated_name = os.path.splitext(basename)[0]
 
-    with tempfile.NamedTemporaryFile(dir=dirname, prefix='.ts2iso-tmp-') as temp_outfile:
-        hdi_args = [ "hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-udf-volume-name", base, "-o", temp_outfile.name, infile ]
+    temp_outfile = '%s/.%s-%s.iso' % (dirname, undecorated_name, str(os.getpid()))
+    hdi_args = [ "hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-udf-volume-name", basename, "-o", temp_outfile, infile ]
 
-        print hdi_args  
-        if not dry_run:
-            sp.call(hdi_args)
-            shutil.move(temp_outfile.name, outfile)
+    print hdi_args
+    if not dry_run:
+        sp.call(hdi_args)
+        shutil.move(temp_outfile, outfile)
 
 def lines_from_file(file):
     '''
@@ -110,6 +111,9 @@ if __name__ == '__main__':
             help='Supply a list of files to transcode in FILE')
     parser.add_argument('-s', '--skip-existing', action='store_true',
             help='Skip transcoding files if the output file already exists')
+    parser.add_argument('-n', '--dry-run', action='store_true',
+            help="Look at the files, but don't do anything")
+
     args = parser.parse_args()
 
     # ensure the output directory exists
@@ -120,6 +124,6 @@ if __name__ == '__main__':
             log.error("Couldn't create directory '%s'" % args.output_dir)
 
     for f in itertools.chain( args.files, lines_from_file( args.input_file ) ):
-        transcode(f, None, True, True)
+        transcode(f, outfile=None, skip_existing=args.skip_existing, dry_run=args.dry_run)
 
 
