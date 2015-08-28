@@ -8,6 +8,7 @@ import shutil
 import subprocess as sp
 import sys
 import tempfile
+import datetime
 
 
 def change_file_ext(fname, ext):
@@ -33,13 +34,17 @@ def transcode(infile, outfile=None, skip_existing=True, dry_run = True):
     basename = os.path.basename(outfile)
     undecorated_name = os.path.splitext(basename)[0]
 
-    temp_outfile = '%s/.%s-%s.iso' % (dirname, undecorated_name, str(os.getpid()))
+    temp_outfile = '%s/.ts2iso-%s-%s.iso' % (dirname, undecorated_name, str(os.getpid()))
     hdi_args = [ "hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-udf-volume-name", basename, "-o", temp_outfile, infile ]
 
     print hdi_args
-    if not dry_run:
+    if dry_run:
+        return None
+    else:
         sp.call(hdi_args)
         shutil.move(temp_outfile, outfile)
+
+    return 0 # return value
 
 def lines_from_file(file):
     '''
@@ -93,6 +98,32 @@ def walk_paths(path_list, follow_links=False):
                 yield p
 
 
+def init_logger(args):
+    # set log level and format
+    log = logging.getLogger('ts2iso')
+    log.setLevel(logging.INFO)
+
+    # prevent 'no loggers found' warning
+    log.addHandler(logging.NullHandler())
+
+    # custom log formatting
+    formatter = logging.Formatter('[%(levelname)s] %(message)s')
+
+    # log to stderr unless disabled
+    if not args.quiet:
+        sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
+        log.addHandler(sh)
+
+    # add a file handler if specified
+    if args.logfile is not None:
+        fh = logging.FileHandler(args.logfile)
+        fh.setFormatter(formatter)
+        log.addHandler(fh)
+
+    return log
+
+
 if __name__ == '__main__':
     import logging
     import time
@@ -113,8 +144,13 @@ if __name__ == '__main__':
             help='Skip transcoding files if the output file already exists')
     parser.add_argument('-n', '--dry-run', action='store_true',
             help="Look at the files, but don't do anything")
+    parser.add_argument('-l', '--logfile', type=os.path.normpath, default=None,
+            help='log output to a file as well as to the console.')
+    parser.add_argument('-q', '--quiet', action='store_true',
+            help='Disable console output.')
 
     args = parser.parse_args()
+    log = init_logger(args)
 
     # ensure the output directory exists
     if args.output_dir is not None:
@@ -124,6 +160,18 @@ if __name__ == '__main__':
             log.error("Couldn't create directory '%s'" % args.output_dir)
 
     for f in itertools.chain( args.files, lines_from_file( args.input_file ) ):
-        transcode(f, outfile=None, skip_existing=args.skip_existing, dry_run=args.dry_run)
+        log.info("Transcoding '%s'..." % f)
+        # time the transcode
+        start_time = time.time()
+        retcode = transcode(f, outfile=None, skip_existing=args.skip_existing, dry_run=args.dry_run)
+        total_time = time.time() - start_time
 
-
+        # log success or error
+        if retcode == 0:
+            log.info("Transcoded '%s' in %s" % 
+                ( f, '{:0>8}'.format(datetime.timedelta(seconds=total_time) ) ) )
+        elif retcode == None:
+            log.info("Skipped '%s'", f)
+        else:
+            log.error("Failed to transcode '%s' after %s" %
+                ( f, '{:0>8}'.format(datetime.timedelta(seconds=total_time) ) ) )
