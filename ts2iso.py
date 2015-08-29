@@ -11,13 +11,29 @@ import tempfile
 import datetime
 
 
+def ensure_directory(d, ignore_errors=False):
+    '''
+    Given a directory, ensures that it exists by creating the directory tree if
+    it's not already present. Returns True if the directory was created, False
+    if it already exists.
+    '''
+
+    try:
+        os.makedirs(d)
+        return True
+    except OSError, e:
+        # propogate the error if it DOESN'T indicate that the directory already
+        # exists.
+        if e.errno != 17 and not ignore_errors:
+            raise e
+        return False
+
+
 def change_file_ext(fname, ext):
     '''Transforms the given filename's extension to the given extension.'''
     return os.path.splitext(fname)[0] + ext
 
-def transcode(infile, outfile=None, skip_existing=True, dry_run = True):
-    outfile = outfile or change_file_ext(infile, '.iso')
-
+def transcode(infile, outfile, skip_existing=True, dry_run = True):
     # skip transcoding existing files if specified
     if skip_existing and os.path.exists(outfile):
         print outfile, "already exists.  Skipping..."
@@ -148,9 +164,13 @@ if __name__ == '__main__':
             help='log output to a file as well as to the console.')
     parser.add_argument('-q', '--quiet', action='store_true',
             help='Disable console output.')
+    parser.add_argument('-d', '--root-dir', type=os.path.abspath,
+            help='Root directory containing your source media.  Preserve directory ' +
+            'structure from this point in --output-dir')
 
     args = parser.parse_args()
     log = init_logger(args)
+
 
     # ensure the output directory exists
     if args.output_dir is not None:
@@ -163,7 +183,19 @@ if __name__ == '__main__':
         log.info("Transcoding '%s'..." % f)
         # time the transcode
         start_time = time.time()
-        retcode = transcode(f, outfile=None, skip_existing=args.skip_existing, dry_run=args.dry_run)
+
+        # assign the output directory
+        outfile = change_file_ext(f, '.iso')
+
+        if args.output_dir is not None:
+            common_prefix = args.root_dir or os.path.dirname(outfile)
+            outfile = os.path.join(args.output_dir,
+                    outfile.replace(common_prefix, '').strip('/'))
+            # make the directory to ensure it exists.
+            ensure_directory(os.path.dirname(outfile))
+
+
+        retcode = transcode(f, outfile, skip_existing=args.skip_existing, dry_run=args.dry_run)
         total_time = time.time() - start_time
 
         # log success or error
