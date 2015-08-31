@@ -3,3 +3,5 @@
 find /Volumes/Volume_2/max-movies -type d -depth 1 | ./ts2iso.py --dry-run --skip-existing -f -
 
 rsync --dry-run --remove-source-files --progress -av *.iso /Volumes/Volume_2/max-movies/
+
+find   . -mindepth 1  -maxdepth 1 -type d -print0 | xargs -0 -n 1 -I {} mv {} ../transcoded
