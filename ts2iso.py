@@ -53,7 +53,7 @@ def transcode(infile, outfile, skip_existing=True, dry_run = True):
     temp_outfile = '%s/.ts2iso-%s-%s.iso' % (dirname, undecorated_name, str(os.getpid()))
     hdi_args = [ "hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-udf-volume-name", basename, "-o", temp_outfile, infile ]
 
-    print hdi_args
+    print ' '.join(hdi_args)
     if dry_run:
         return None
     else:
@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
     # options and flags
     parser.add_argument('-o', '--output-dir', type=os.path.abspath,
-            help='Directory to output transcoded files to')
+            help='Directory to output transcoded files.  Defaults to source dir')
     parser.add_argument('-f', '--file', nargs='?', type=argparse.FileType('r'), 
             default=None, dest='input_file',
             help='Supply a list of files to transcode in FILE')
